@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="로컬 저장 기반 포켓몬/TCG 카드팩 개봉 시뮬레이터">
+  <title>Local TCG Pack Opener</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="brand-block" aria-label="앱 이름">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="brand-mark-top"></span>
+          <span class="brand-mark-core">TCG</span>
+          <span class="brand-mark-bottom"></span>
+        </div>
+        <div>
+          <h1>Local Pack Opener</h1>
+          <p>개인 로컬용 카드팩 오픈 시뮬레이터</p>
+        </div>
+      </div>
+
+      <div class="source-badge" id="dataSourceLabel">카드 데이터 준비 중...</div>
+    </header>
+
+    <main class="main-layout">
+      <section class="control-band" aria-label="메인 메뉴">
+        <button class="primary-action" id="openPackBtn" type="button">
+          <span class="pack-button-icon" aria-hidden="true"></span>
+          Pack Open
+        </button>
+        <button class="secondary-action" id="open5PacksBtn" type="button">Open 5 Packs</button>
+        <button class="secondary-action" id="open10PacksBtn" type="button">Open 10 Packs</button>
+        <button class="secondary-action" id="openBoxBtn" type="button">Open Box 30 Packs</button>
+        <button class="secondary-action" id="collectionBtn" type="button">Collection</button>
+        <button class="secondary-action" id="soundToggleBtn" type="button" aria-pressed="true">Sound On</button>
+        <button class="danger-action" id="resetSaveBtn" type="button">Reset Save</button>
+      </section>
+
+      <section class="pack-setup-band" aria-label="팩 선택">
+        <label class="search-field" for="packSearchInput">
+          <span>Search Packs</span>
+          <input id="packSearchInput" type="search" autocomplete="off" placeholder="세트/팩 이름 검색">
+        </label>
+        <label class="select-field" for="seriesSelect">
+          <span>Series</span>
+          <select id="seriesSelect"></select>
+        </label>
+        <label class="select-field" for="setSelect">
+          <span>Set</span>
+          <select id="setSelect"></select>
+        </label>
+        <label class="select-field" for="packSelect">
+          <span>Pack</span>
+          <select id="packSelect"></select>
+        </label>
+
+        <div class="admin-panel" id="adminPanel" hidden>
+          <label class="select-field" for="oddsModeSelect">
+            <span>Odds Mode</span>
+            <select id="oddsModeSelect"></select>
+          </label>
+          <label class="file-loader">
+            <input id="localJsonInput" type="file" accept="application/json,.json">
+            <span>Load Local DB</span>
+          </label>
+          <label class="api-key-field" for="apiKeyInput">
+            <span>API Key</span>
+            <input id="apiKeyInput" type="password" autocomplete="off" placeholder="Optional">
+          </label>
+          <button class="secondary-action compact" id="saveApiKeyBtn" type="button">Save Key</button>
+          <button class="secondary-action compact" id="loadApiBtn" type="button">Load API</button>
+          <button class="danger-action compact" id="clearApiKeyBtn" type="button">Clear Key</button>
+        </div>
+      </section>
+
+      <section class="pack-shelf-panel" aria-label="팩 진열장">
+        <div class="pack-shelf-heading">
+          <div>
+            <p class="eyebrow">Pack Shelf</p>
+            <h2>팩 진열장</h2>
+          </div>
+          <p id="packShelfStatus">팩 데이터를 불러오면 여기에 표시됩니다.</p>
+        </div>
+        <div class="pack-shelf" id="packShelf"></div>
+      </section>
+
+      <section class="stats-band" aria-label="컬렉션 통계">
+        <div class="stat-item">
+          <span class="stat-label">전체 카드</span>
+          <strong id="totalCardsStat">0</strong>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">보유 카드</span>
+          <strong id="ownedCardsStat">0</strong>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">수집률</span>
+          <strong id="collectionRateStat">0%</strong>
+        </div>
+      </section>
+
+      <section class="stage-panel" aria-live="polite">
+        <div class="stage-heading">
+          <div>
+            <p class="eyebrow">Booster Counter</p>
+            <h2 id="stageTitle">팩 개봉 대기 중</h2>
+          </div>
+          <p class="stage-status" id="stageStatus">카드 데이터를 불러오고 있습니다.</p>
+        </div>
+
+        <div class="pack-grid is-empty" id="packGrid">
+          <div class="sealed-pack">
+            <div class="sealed-pack-shine"></div>
+            <div class="sealed-pack-title">BOOSTER</div>
+            <div class="sealed-pack-subtitle">5 cards</div>
+          </div>
+        </div>
+
+        <section class="result-panel" id="packResultPanel" hidden>
+          <div>
+            <p class="eyebrow">Pack Result</p>
+            <h3 id="resultHeading">이번 팩 결과</h3>
+          </div>
+          <div class="best-card-summary" id="bestCardSummary"></div>
+          <div class="result-list" id="resultList"></div>
+        </section>
+      </section>
+
+      <section class="collection-panel" id="collectionPanel" hidden>
+        <div class="collection-heading">
+          <div>
+            <p class="eyebrow">Collection Binder</p>
+            <h2>컬렉션</h2>
+          </div>
+          <div class="collection-tools">
+            <label class="search-field compact-field" for="collectionSearchInput">
+              <span>Find</span>
+              <input id="collectionSearchInput" type="search" autocomplete="off" placeholder="카드 이름 검색">
+            </label>
+            <label class="select-field compact-field" for="collectionFilterSelect">
+              <span>Show</span>
+              <select id="collectionFilterSelect">
+                <option value="all">All</option>
+                <option value="owned">Owned</option>
+                <option value="missing">Missing</option>
+              </select>
+            </label>
+            <label class="select-field compact-field" for="collectionSortSelect">
+              <span>Sort</span>
+              <select id="collectionSortSelect">
+                <option value="set">Set #</option>
+                <option value="rarity">Rarity</option>
+                <option value="price">Price</option>
+                <option value="duplicates">Duplicates</option>
+                <option value="newest">Newest</option>
+              </select>
+            </label>
+            <button class="secondary-action compact" id="closeCollectionBtn" type="button">Close</button>
+          </div>
+        </div>
+        <div class="collection-dashboard" id="collectionDashboard"></div>
+        <div class="collection-grid" id="collectionGrid"></div>
+      </section>
+    </main>
+
+    <footer class="support-footer">
+      <section class="premium-unlock-panel" aria-label="프리미엄 인증">
+        <div class="premium-unlock-copy">
+          <span class="premium-eyebrow">Premium Access</span>
+          <strong id="premiumStatusText">무료 모드</strong>
+          <small>내 고유 번호: <code id="premiumUserIdText">USER-0000</code></small>
+        </div>
+        <form class="premium-unlock-form" id="premiumUnlockForm">
+          <label for="premiumCodeInput">인증 코드</label>
+          <input id="premiumCodeInput" type="text" autocomplete="off" placeholder="ANSWER-000000">
+          <button class="secondary-action compact" type="submit">Unlock</button>
+        </form>
+        <label class="premium-odds-field" for="premiumOddsSelect">
+          <span>Odds Mode</span>
+          <select id="premiumOddsSelect"></select>
+        </label>
+      </section>
+      <a class="support-link coffee-link" href="https://toss.me/yourid" target="_blank" rel="noopener noreferrer">제작자에게 커피 후원하기</a>
+      <a class="support-link store-link" href="https://smartstore.naver.com" target="_blank" rel="noopener noreferrer">미개봉 팩 &amp; 리셀 스토어 구경가기</a>
+    </footer>
+  </div>
+
+  <div class="rarity-overlay" id="rarityOverlay" aria-hidden="true">
+    <div class="effect-card" id="effectCard"></div>
+    <div class="effect-text" id="effectText"></div>
+  </div>
+
+  <div class="owner-admin-panel" id="ownerAdminPanel" hidden>
+    <div class="owner-admin-heading">
+      <strong>관리자 패널</strong>
+      <span>Admin Mode</span>
+    </div>
+    <div class="owner-admin-actions">
+      <button class="secondary-action compact" id="forceActiveSetSyncBtn" type="button">현재 선택 세트만 동기화</button>
+      <button class="primary-action compact" id="forceApiSyncBtn" type="button">전체 카드/시세 강제 동기화</button>
+    </div>
+    <div class="owner-admin-stats" id="ownerAdminStats" aria-live="polite">
+      <span>IndexedDB 상태 확인 중...</span>
+    </div>
+    <button class="secondary-action compact" id="refreshAdminStatusBtn" type="button">상태 새로고침</button>
+    <p id="forceApiSyncStatus">API 락을 무시하고 IndexedDB를 즉시 최신화합니다.</p>
+  </div>
+</body>
+</html>
