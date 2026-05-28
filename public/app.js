@@ -1124,7 +1124,7 @@ function renderPremiumPanel() {
   if (dom.premiumStatusText) {
     dom.premiumStatusText.textContent = state.isPremium
       ? "프리미엄 활성화"
-      : "무료 모드 · 컬렉션은 새로고침 시 초기화";
+      : "무료 모드 · 컬렉션 저장 가능 · 10/30팩 잠금";
   }
 
   if (dom.premiumCodeInput) {
@@ -1141,6 +1141,8 @@ function renderPremiumPanel() {
       unlockButton.textContent = state.isPremium ? "Unlocked" : "Unlock";
     }
   }
+
+  updatePremiumBulkButtons();
 }
 
 function unlockPremiumFromCode(event) {
@@ -1168,7 +1170,7 @@ function unlockPremiumFromCode(event) {
   renderOddsModeSelect();
   renderCollection();
   updateStats();
-  setStageStatus("프리미엄이 활성화되었습니다. 컬렉션 영구 저장과 God Pack 모드가 열렸습니다.");
+  setStageStatus("프리미엄이 활성화되었습니다. 10/30팩 대량 개봉과 God Pack 모드가 열렸습니다.");
 }
 
 function normalizePremiumCode(code) {
@@ -3360,6 +3362,11 @@ async function openPack() {
 }
 
 async function openBulkPacks(packCount) {
+  if (!canUseBulkOpen(packCount)) {
+    showPremiumBulkLockMessage(packCount);
+    return;
+  }
+
   const pack = getActivePack();
 
   if (!pack) {
@@ -3581,14 +3588,38 @@ function cancelManualSeries() {
 function setOpeningControlsDisabled(disabled) {
   [
     dom.openPackBtn,
-    dom.open5PacksBtn,
-    dom.open10PacksBtn,
-    dom.openBoxBtn
+    dom.open5PacksBtn
   ].forEach((button) => {
     if (button) {
       button.disabled = disabled;
     }
   });
+
+  updatePremiumBulkButtons(disabled);
+}
+
+function updatePremiumBulkButtons(openingDisabled = false) {
+  [
+    { button: dom.open10PacksBtn, packCount: 10 },
+    { button: dom.openBoxBtn, packCount: 30 }
+  ].forEach(({ button, packCount }) => {
+    if (!button) {
+      return;
+    }
+
+    const locked = !canUseBulkOpen(packCount);
+    button.disabled = openingDisabled || locked;
+    button.setAttribute("aria-disabled", String(openingDisabled || locked));
+    button.title = locked ? "프리미엄 유저 전용 기능입니다." : "";
+  });
+}
+
+function canUseBulkOpen(packCount) {
+  return ![10, 30].includes(Number(packCount)) || state.isPremium;
+}
+
+function showPremiumBulkLockMessage(packCount) {
+  setStageStatus(`${packCount}팩 한번에 열기는 프리미엄 유저 전용입니다. 1팩 또는 5팩 개봉은 계속 사용할 수 있습니다.`);
 }
 
 function getActivePack() {
@@ -4949,11 +4980,6 @@ function createCutInCardHtml(card) {
 }
 
 function loadCollection() {
-  if (!state.isPremium) {
-    localStorage.removeItem(STORAGE_KEY);
-    return {};
-  }
-
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
   } catch (error) {
@@ -4963,10 +4989,6 @@ function loadCollection() {
 }
 
 function saveCollection() {
-  if (!state.isPremium) {
-    return;
-  }
-
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.collection));
 }
 
@@ -5188,16 +5210,16 @@ function renderCollectionDashboard() {
           <span class="premium-eyebrow">Premium Asset Dashboard</span>
           <strong>나의 총 수집 자산 가치: ${formatPrice(getPremiumCollectionValue())}</strong>
         </div>
-        <p>프리미엄 컬렉션은 이 브라우저에 영구 저장됩니다.</p>
+        <p>프리미엄 유저는 10/30팩 대량 개봉과 God Pack 모드를 사용할 수 있습니다.</p>
       </section>
     `
     : `
       <section class="binder-panel premium-asset-panel is-locked">
         <div>
           <span class="premium-eyebrow">Premium Locked</span>
-          <strong>무료 모드는 새로고침하면 컬렉션이 초기화됩니다.</strong>
+          <strong>컬렉션은 무료 모드에서도 저장됩니다.</strong>
         </div>
-        <p>하단의 고유 번호로 인증 코드를 발급받으면 영구 저장과 God Pack 모드가 열립니다.</p>
+        <p>하단의 고유 번호로 인증 코드를 발급받으면 10/30팩 대량 개봉과 God Pack 모드가 열립니다.</p>
       </section>
     `;
 
